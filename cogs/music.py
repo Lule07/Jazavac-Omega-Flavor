@@ -6,7 +6,7 @@ import logging
 import spotipy
 
 from yt_dlp import YoutubeDL
-from discord.ext import commands
+from discord.ext import commands, tasks
 from discord.utils import get
 from spotipy.oauth2 import SpotifyClientCredentials
 
@@ -24,9 +24,6 @@ class SongEmbed(discord.Embed):
 
         self.set_author(name="Currently playing:", icon_url=info["platform_icon"])
         self.set_footer(text="Jazavac™ Omega Music ©, All rights reserved")
-        # self.set_thumbnail(
-        #    url=f"https://img.youtube.com/vi/{get_video_id(info["video_url"])}/maxresdefault.jpg"
-        # )
         self.set_image(
             url=f"https://img.youtube.com/vi/{get_video_id(info["video_url"])}/maxresdefault.jpg"
         )
@@ -59,7 +56,8 @@ class Music(commands.Cog):
         self.queue = asyncio.Queue(maxsize=150)
         self.playing_lock = asyncio.Lock()
 
-    # *DONE - Checks if a url is a valid Spotify url
+        self.exit_voice_chat.start()
+
     def is_spotify_url(self, url: str) -> bool:
         pattern = re.compile(
             r"https?:\/\/(open\.spotify\.com\/(track|album|playlist|artist|episode|show)\/[a-zA-Z0-9]+|spotify:(track|album|playlist|artist|episode|show):[a-zA-Z0-9]+)"  # Spotify urls
@@ -67,7 +65,6 @@ class Music(commands.Cog):
 
         return bool(pattern.match(url))
 
-    # *DONE - Checks if a url is a valid Youtube url
     def is_yt_url(self, url: str) -> bool:
         pattern = re.compile(
             r"^(https?://)?(www\.)?(youtube\.com|youtu\.be)/"  # Domain
@@ -77,7 +74,6 @@ class Music(commands.Cog):
 
         return bool(pattern.match(url))
 
-    # *DONE - Returns the stream url from a url or a search query on Spotify
     def get_info_from_spotify(self, query: str) -> dict | None:
         with YoutubeDL(self.ytdl_opts) as ytdl:
             if self.is_spotify_url(query):
@@ -145,7 +141,6 @@ class Music(commands.Cog):
                 logging.error(e)
                 return None
 
-    # *DONE - Returns the stream url from a url or a search query on Youtube
     def get_info_from_yt(self, query: str) -> dict | None:
         with YoutubeDL(self.ytdl_opts) as ytdl:
             if self.is_yt_url(query):
@@ -191,7 +186,6 @@ class Music(commands.Cog):
                 logging.error(e)
                 return None
 
-    # *DONE - Returns the voice client of a voice chat in the specified guild context
     async def get_voice_client(
         self, ctx: discord.ApplicationContext
     ) -> discord.VoiceClient | None:
@@ -204,7 +198,6 @@ class Music(commands.Cog):
         voice_state: discord.VoiceState | None = ctx.author.voice
         voice_channel: discord.VoiceChannel = voice_state.channel
 
-        # Tries to get the current voice client in a guild if it exists
         self.voice_client: discord.VoiceClient = get(
             self.bot.voice_clients, guild=ctx.guild
         )
@@ -273,7 +266,30 @@ class Music(commands.Cog):
             await self.queue.get()
             self.queue.task_done()
 
-    # *DONE - Puts the provided song into queue and starts playing it
+    @tasks.loop(seconds=10)
+    async def exit_voice_chat(self):
+        if self.voice_client and self.voice_client.is_connected():
+            voice_channel: discord.VoiceChannel = self.voice_client.channel
+            bot_member: discord.Member = voice_channel.guild.get_member(
+                self.bot.user.id
+            )
+
+        else:
+            return
+
+        if bot_member in voice_channel.members and len(voice_channel.members) == 1:
+            try:
+                if self.voice_client.is_playing():
+                    self.voice_client.stop()
+                    await self.clear_queue()
+                await self.voice_client.disconnect()
+                self.voice_client = None
+            except Exception as e:
+                logging.warning(e)
+
+        else:
+            return
+
     @commands.slash_command(
         name="play", description="Plays the selected song from Youtube or Spotify."
     )
@@ -306,7 +322,6 @@ class Music(commands.Cog):
                 await ctx.respond("You must be in a voice channel to use this command.")
                 return
 
-        # Add the song to the queue
         await self.queue.put(info)
         await ctx.respond(f"Added song to queue.", ephemeral=True)
         try:
@@ -314,7 +329,6 @@ class Music(commands.Cog):
         except Exception as e:
             logging.warning(e)
 
-        # Start playback if not already playing
         if not self.voice_client.is_playing() and not self.voice_client.is_paused():
             await self.play_song()
 
