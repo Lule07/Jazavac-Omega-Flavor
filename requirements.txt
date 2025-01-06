@@ -1,0 +1,6 @@
+py-cord[voice]
+asyncio
+PyNaCl
+python-dotenv
+yt-dlp
+spotipy
