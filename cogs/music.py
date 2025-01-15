@@ -236,7 +236,7 @@ class Music(commands.Cog):
                 source=discord.FFmpegOpusAudio(
                     info["stream_url"],
                     before_options="-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
-                    options="-vn -af 'equalizer=f=60:width_type=h:width=100:g=3'",
+                    options="-vn -af 'equalizer=f=60:width_type=h:width=100:g=2'",
                 ),
                 after=lambda _: self.bot.loop.call_soon_threadsafe(
                     self.bot.loop.create_task, self.end_song()
@@ -365,7 +365,7 @@ class Music(commands.Cog):
             and self.playing_lock.locked()
         ):
             await ctx.defer()
-            await self.voice_client.stop()
+            self.voice_client.stop()
             await self.clear_queue()
             await self.song_msg.delete(delay=0)
             await ctx.respond("Stopped the music.")
@@ -376,6 +376,24 @@ class Music(commands.Cog):
                 logging.warning(e)
         else:
             await ctx.respond("There is no music playing.")
+            try:
+                await ctx.delete(delay=3)
+            except Exception as e:
+                logging.warning(e)
+
+    @commands.slash_command(name="exit", description="Exits the voice channel.")
+    async def disconnect(self, ctx: discord.ApplicationContext) -> None:
+        if self.voice_client and self.voice_client.is_connected():
+            await ctx.defer()
+            await self.voice_client.disconnect()
+            self.voice_client = None
+            await ctx.respond("Disconnected from the voice channel.")
+            try:
+                await ctx.delete(delay=3)
+            except Exception as e:
+                logging.warning(e)
+        else:
+            await ctx.respond("There is no voice client to disconnect.")
             try:
                 await ctx.delete(delay=3)
             except Exception as e:
