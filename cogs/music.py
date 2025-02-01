@@ -152,9 +152,9 @@ class Music(commands.Cog):
                         return {
                             "stream_url": data["url"],
                             "video_url": query,
-                            "title": data["entries"][0]["title"],
+                            "title": data["title"],
                             "platform_icon": "https://cdn4.iconfinder.com/data/icons/social-messaging-ui-color-shapes-2-free/128/social-youtube-circle-512.png",
-                            "duration": data["entries"][0]["duration"],
+                            "duration": data["duration"],
                         }
 
                     logging.warning(f"No song for query: {query}")

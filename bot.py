@@ -10,7 +10,7 @@ async def on_ready() -> None:
     print("The bot is ready!")
 
 
-for cog in ["cogs.music"]:
+for cog in ["cogs.music", "cogs.utils"]:
     bot.load_extension(cog)
 
 
